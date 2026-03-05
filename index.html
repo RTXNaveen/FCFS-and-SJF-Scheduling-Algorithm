@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced CPU Scheduler Pro</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --background: #f1f5f9;
+            --glass: rgba(255, 255, 255, 0.9);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--background);
+            color: #1e293b;
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.5;
+        }
+
+        .app-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        header { text-align: center; margin-bottom: 2rem; }
+        h1 { margin: 0; font-size: 2rem; color: #0f172a; letter-spacing: -0.025em; }
+        p.subtitle { color: var(--secondary); margin-top: 0.5rem; }
+
+        /* Input Grid */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1.5rem;
+            align-items: end;
+        }
+
+        .field-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        label { font-size: 0.875rem; font-weight: 600; color: #475569; }
+        input, select {
+            padding: 0.75rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        input:focus { outline: none; border-color: var(--primary); ring: 2px var(--primary); }
+
+        .actions { display: flex; gap: 1rem; margin-top: 2rem; }
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        button:active { transform: scale(0.98); }
+        .btn-primary { background: var(--primary); color: white; flex: 2; }
+        .btn-secondary { background: #e2e8f0; color: #475569; flex: 1; }
+        .btn-danger { background: #fee2e2; color: var(--danger); }
+
+        /* Gantt Chart */
+        .gantt-scroll { overflow-x: auto; padding-bottom: 1rem; margin: 2rem 0; }
+        .gantt-track {
+            display: flex;
+            position: relative;
+            padding-bottom: 30px;
+            min-width: max-content;
+        }
+        .gantt-node {
+            height: 60px;
+            border: 2px solid #fff;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .gantt-node.idle { background: #e2e8f0; color: #94a3b8; border-style: dashed; }
+        .time-mark {
+            position: absolute;
+            bottom: -25px;
+            left: 0;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: var(--secondary);
+        }
+        .last-mark { left: auto; right: 0; }
+
+        /* Stats & Table */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .stat-val { display: block; font-size: 1.5rem; font-weight: 800; color: var(--primary); }
+        .stat-label { font-size: 0.75rem; text-transform: uppercase; color: var(--secondary); }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
+        th { background: #f8fafc; padding: 1rem; text-align: left; font-size: 0.875rem; color: var(--secondary); }
+        td { padding: 1rem; border-top: 1px solid #f1f5f9; }
+        tr:hover { background: #fcfdff; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header>
+        <h1>CPU Scheduling Simulator</h1>
+        <p class="subtitle">Analyze FCFS and SJF Algorithm Efficiency</p>
+    </header>
+
+    <div class="card">
+        <div class="controls">
+            <div class="field-group">
+                <label>Process Name</label>
+                <input type="text" id="pid" placeholder="e.g. P1">
+            </div>
+            <div class="field-group">
+                <label>Arrival Time</label>
+                <input type="number" id="arrival" value="0" min="0">
+            </div>
+            <div class="field-group">
+                <label>Burst Time</label>
+                <input type="number" id="burst" value="1" min="1">
+            </div>
+            <div class="field-group">
+                <label>Algorithm</label>
+                <select id="algo">
+                    <option value="FCFS">FCFS</option>
+                    <option value="SJF">SJF (Non-Preemptive)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn-secondary" onclick="addProcess()">Add Process</button>
+            <button class="btn-primary" onclick="simulate()">Run Simulation</button>
+            <button class="btn-danger" onclick="reset()">Reset</button>
+        </div>
+    </div>
+
+    <div id="output-section" style="display: none;">
+        <div class="card">
+            <h3>Gantt Chart</h3>
+            <div class="gantt-scroll">
+                <div id="gantt-track" class="gantt-track"></div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span id="avg-wt" class="stat-val">0.00</span>
+                    <span class="stat-label">Avg. Waiting Time</span>
+                </div>
+                <div class="stat-card">
+                    <span id="avg-tat" class="stat-val">0.00</span>
+                    <span class="stat-label">Avg. Turnaround Time</span>
+                </div>
+            </div>
+
+            <table id="result-table">
+                <thead>
+                    <tr>
+                        <th>Process</th>
+                        <th>Arrival</th>
+                        <th>Burst</th>
+                        <th>Finish</th>
+                        <th>TAT</th>
+                        <th>WT</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let processes = [];
+
+    function addProcess() {
+        const pid = document.getElementById('pid').value || `P${processes.length + 1}`;
+        const arrival = parseInt(document.getElementById('arrival').value);
+        const burst = parseInt(document.getElementById('burst').value);
+
+        if (isNaN(arrival) || isNaN(burst)) return alert("Please enter valid numbers");
+
+        processes.push({ pid, arrival, burst });
+        document.getElementById('pid').value = "";
+        alert(`Process ${pid} added to the queue.`);
+    }
+
+    function reset() {
+        processes = [];
+        document.getElementById('output-section').style.display = 'none';
+    }
+
+    function simulate() {
+        if (processes.length === 0) return alert("Queue is empty!");
+
+        const algo = document.getElementById('algo').value;
+        const resultSection = document.getElementById('output-section');
+        resultSection.style.display = 'block';
+
+        let readyQueue = [...processes];
+        let timeline = [];
+        let results = [];
+        let currentTime = 0;
+
+        // Sort by arrival initially
+        readyQueue.sort((a, b) => a.arrival - b.arrival);
+
+        if (algo === "FCFS") {
+            readyQueue.forEach(p => {
+                if (currentTime < p.arrival) {
+                    timeline.push({ pid: 'Idle', start: currentTime, end: p.arrival, type: 'idle' });
+                    currentTime = p.arrival;
+                }
+                let start = currentTime;
+                currentTime += p.burst;
+                results.push(calculateMetrics(p, start, currentTime));
+                timeline.push({ pid: p.pid, start, end: currentTime, type: 'proc' });
+            });
+        } else {
+            // SJF Logic
+            let completed = 0;
+            let n = readyQueue.length;
+            let finished = new Array(n).fill(false);
+
+            while (completed < n) {
+                let idx = -1;
+                let minBurst = Infinity;
+
+                for (let i = 0; i < n; i++) {
+                    if (readyQueue[i].arrival <= currentTime && !finished[i]) {
+                        if (readyQueue[i].burst < minBurst) {
+                            minBurst = readyQueue[i].burst;
+                            idx = i;
+                        }
+                    }
+                }
+
+                if (idx !== -1) {
+                    let p = readyQueue[idx];
+                    let start = currentTime;
+                    currentTime += p.burst;
+                    results.push(calculateMetrics(p, start, currentTime));
+                    timeline.push({ pid: p.pid, start, end: currentTime, type: 'proc' });
+                    finished[idx] = true;
+                    completed++;
+                } else {
+                    let nextArrival = Math.min(...readyQueue.filter((_, i) => !finished[i]).map(p => p.arrival));
+                    timeline.push({ pid: 'Idle', start: currentTime, end: nextArrival, type: 'idle' });
+                    currentTime = nextArrival;
+                }
+            }
+        }
+
+        renderUI(timeline, results);
+    }
+
+    function calculateMetrics(p, start, finish) {
+        const tat = finish - p.arrival;
+        const wt = tat - p.burst;
+        return { ...p, finish, tat, wt };
+    }
+
+    function renderUI(timeline, results) {
+        // Render Gantt
+        const track = document.getElementById('gantt-track');
+        track.innerHTML = "";
+        timeline.forEach((item, index) => {
+            const node = document.createElement('div');
+            node.className = `gantt-node ${item.type === 'idle' ? 'idle' : ''}`;
+            const width = (item.end - item.start) * 40;
+            node.style.width = `${width}px`;
+            
+            node.innerHTML = `
+                ${item.pid}
+                <span class="time-mark">${item.start}</span>
+                ${index === timeline.length - 1 ? `<span class="time-mark last-mark">${item.end}</span>` : ''}
+            `;
+            track.appendChild(node);
+        });
+
+        // Render Table
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = "";
+        let totalWT = 0, totalTAT = 0;
+
+        results.forEach(r => {
+            totalWT += r.wt;
+            totalTAT += r.tat;
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${r.pid}</strong></td>
+                    <td>${r.arrival}</td>
+                    <td>${r.burst}</td>
+                    <td>${r.finish}</td>
+                    <td>${r.tat}</td>
+                    <td>${r.wt}</td>
+                </tr>
+            `;
+        });
+
+        // Update Stats
+        document.getElementById('avg-wt').innerText = (totalWT / results.length).toFixed(2);
+        document.getElementById('avg-tat').innerText = (totalTAT / results.length).toFixed(2);
+    }
+</script>
+
+</body>
+</html>
